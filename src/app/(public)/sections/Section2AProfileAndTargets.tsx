@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const LS_KEY = "smooday_v1_quickcheck";
 
@@ -30,15 +30,11 @@ type Stored = {
     eaaGrams: number;
   };
   targets: { kcal: number; p: number; f: number; c: number };
-  profile: Profile; // ✅ not optional
+  profile: Profile;
 };
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
 }
 
 function safeNum(v: any) {
@@ -102,18 +98,22 @@ function ensureDefaults(s: Stored | null): Stored {
     meals: Array.isArray(s.meals) && s.meals.length ? s.meals : base.meals,
     supplements: { ...base.supplements, ...(s.supplements || {}) },
     targets: { ...base.targets, ...(s.targets || {}) },
-    profile: { ...base.profile, ...(s.profile || {}) }, // ✅ keeps nulls
+    profile: { ...base.profile, ...(s.profile || {}) },
   };
 }
 
-/** --- Calculations (simple, stable) --- */
+/** --- Calculations --- */
 function calcBmr(p: Profile) {
   const w = p.weightKg ?? 0;
   const h = p.heightCm ?? 0;
   const a = p.age ?? 0;
   const sex = p.sex;
 
-  if (!w || !h || !a || !sex) return null;
+  // validate here (not while typing)
+  if (!sex) return null;
+  if (a < 5 || a > 120) return null;
+  if (h < 80 || h > 250) return null;
+  if (w < 20 || w > 300) return null;
 
   const base = 10 * w + 6.25 * h - 5 * a;
   return Math.round(sex === "male" ? base + 5 : base - 161);
@@ -124,6 +124,7 @@ function calcPal(p: Profile) {
   const tr = p.trainingActivity;
 
   let pal = job === "low" ? 1.35 : job === "medium" ? 1.55 : 1.75;
+
   if (tr === "light") pal += 0.1;
   if (tr === "moderate") pal += 0.2;
   if (tr === "high") pal += 0.3;
@@ -149,6 +150,7 @@ function autoTargets(p: Profile) {
   const w = p.weightKg ?? 0;
   const protein = w ? Math.round(w * (p.goal === "gain_muscle" ? 2.0 : 1.8)) : null;
   const fat = w ? Math.round(w * 0.9) : null;
+
   const carbs =
     calories && protein != null && fat != null
       ? Math.max(0, Math.round((calories - (protein * 4 + fat * 9)) / 4))
@@ -157,7 +159,7 @@ function autoTargets(p: Profile) {
   return { calories, protein, fat, carbs, bmr, pal, tdee };
 }
 
-/** ✅ Input that allows empty string and typing */
+/** Input that lets you type normally */
 function InputMini({
   label,
   value,
@@ -196,6 +198,7 @@ function InputMini({
 
 export default function Section2AProfileAndTargets() {
   const [data, setData] = useState<Stored>(() => ensureDefaults(null));
+  const targetsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setData(ensureDefaults(readLS()));
@@ -224,6 +227,15 @@ export default function Section2AProfileAndTargets() {
     }));
   }
 
+  function applyAutoTargetsAndScroll() {
+    if (!auto) return;
+    applyAutoTargets();
+    // Smooth scroll to Daily targets so user sees the updated numbers
+    setTimeout(() => {
+      targetsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
   function resetProfileAndTargets() {
     setData((prev) => ({
       ...prev,
@@ -250,13 +262,20 @@ export default function Section2AProfileAndTargets() {
           </p>
         </div>
 
-        <div className="flex gap-2">
+        {/* Desktop actions (keep up top) */}
+        <div className="hidden md:flex gap-2">
           <button className="btn btn-ghost" type="button" onClick={resetProfileAndTargets}>
             Reset targets/profile
           </button>
-
           <button className="btn btn-primary" type="button" onClick={applyAutoTargets} disabled={!auto}>
             Auto-calc targets
+          </button>
+        </div>
+
+        {/* Mobile action: reset only (auto button is moved down) */}
+        <div className="md:hidden">
+          <button className="btn btn-ghost w-full justify-center" type="button" onClick={resetProfileAndTargets}>
+            Reset targets/profile
           </button>
         </div>
       </div>
@@ -271,21 +290,35 @@ export default function Section2AProfileAndTargets() {
             </div>
           </div>
 
-          {auto ? (
-            <div className="text-xs" style={{ color: "var(--sd-slate)" }}>
-              BMR <b style={{ color: "var(--sd-ink)" }}>{auto.bmr}</b> • PAL{" "}
-              <b style={{ color: "var(--sd-ink)" }}>{auto.pal}</b> • TDEE{" "}
-              <b style={{ color: "var(--sd-ink)" }}>{auto.tdee}</b> • Goal kcal{" "}
-              <b style={{ color: "var(--sd-ink)" }}>{auto.calories}</b>
-            </div>
-          ) : (
-            <div className="text-xs" style={{ color: "var(--sd-slate)" }}>
-              Add sex + age + height + weight to see auto-calc preview.
-            </div>
-          )}
+          <div className="flex flex-col gap-2 md:items-end">
+            {auto ? (
+              <div className="text-xs" style={{ color: "var(--sd-slate)" }}>
+                BMR <b style={{ color: "var(--sd-ink)" }}>{auto.bmr}</b> • PAL{" "}
+                <b style={{ color: "var(--sd-ink)" }}>{auto.pal}</b> • TDEE{" "}
+                <b style={{ color: "var(--sd-ink)" }}>{auto.tdee}</b> • Goal kcal{" "}
+                <b style={{ color: "var(--sd-ink)" }}>{auto.calories}</b>
+              </div>
+            ) : (
+              <div className="text-xs" style={{ color: "var(--sd-slate)" }}>
+                Add sex + age + height + weight to see auto-calc preview.
+              </div>
+            )}
+
+            {/* ✅ Small “Auto-calc” in profile that scrolls to targets (mobile-friendly) */}
+            <button
+              type="button"
+              className={`btn btn-primary w-full justify-center md:w-auto ${!auto ? "opacity-60" : ""}`}
+              onClick={applyAutoTargetsAndScroll}
+              disabled={!auto}
+              style={{ padding: "0.6rem 1rem" }}
+            >
+              Auto-calc → Daily targets
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-6">
+          {/* Sex */}
           <div>
             <label className="text-[11px] font-semibold" style={{ color: "var(--sd-slate)" }}>
               Sex
@@ -301,25 +334,22 @@ export default function Section2AProfileAndTargets() {
             </select>
           </div>
 
-          <InputMini
-            label="Age"
-            value={data.profile.age}
-            placeholder="e.g. 32"
-            onChange={(v) => setProfile({ age: v == null ? null : clamp(v, 1, 120) })}
-          />
+          {/* Age / Height / Weight */}
+          <InputMini label="Age" value={data.profile.age} placeholder="e.g. 32" onChange={(v) => setProfile({ age: v })} />
           <InputMini
             label="Height (cm)"
             value={data.profile.heightCm}
             placeholder="e.g. 188"
-            onChange={(v) => setProfile({ heightCm: v == null ? null : clamp(v, 80, 250) })}
+            onChange={(v) => setProfile({ heightCm: v })}
           />
           <InputMini
             label="Weight (kg)"
             value={data.profile.weightKg}
             placeholder="e.g. 105"
-            onChange={(v) => setProfile({ weightKg: v == null ? null : clamp(v, 20, 300) })}
+            onChange={(v) => setProfile({ weightKg: v })}
           />
 
+          {/* Goal */}
           <div>
             <label className="text-[11px] font-semibold" style={{ color: "var(--sd-slate)" }}>
               Goal
@@ -335,32 +365,43 @@ export default function Section2AProfileAndTargets() {
             </select>
           </div>
 
+          {/* Job activity */}
           <div>
             <label className="text-[11px] font-semibold" style={{ color: "var(--sd-slate)" }}>
-              Activity (simple)
+              Job activity
             </label>
             <select
               className="mt-1 w-full rounded-2xl border px-3 py-2.5 text-sm"
-              value={`${data.profile.jobActivity}-${data.profile.trainingActivity}`}
-              onChange={(e) => {
-                const [job, tr] = String(e.target.value).split("-");
-                setProfile({ jobActivity: job as Job, trainingActivity: tr as Training });
-              }}
+              value={data.profile.jobActivity}
+              onChange={(e) => setProfile({ jobActivity: e.target.value as Job })}
             >
-              <option value="low-none">Low + no training</option>
-              <option value="low-light">Low + 1–2x/week</option>
-              <option value="low-moderate">Low + 3–5x/week</option>
-              <option value="medium-light">Medium + 1–2x/week</option>
-              <option value="medium-moderate">Medium + 3–5x/week</option>
-              <option value="high-moderate">High + 3–5x/week</option>
-              <option value="high-high">High + 6+x/week</option>
+              <option value="low">Low (mostly sitting)</option>
+              <option value="medium">Medium (on feet / moving)</option>
+              <option value="high">High (physical work)</option>
+            </select>
+          </div>
+
+          {/* Training activity */}
+          <div className="md:col-span-2">
+            <label className="text-[11px] font-semibold" style={{ color: "var(--sd-slate)" }}>
+              Training activity
+            </label>
+            <select
+              className="mt-1 w-full rounded-2xl border px-3 py-2.5 text-sm"
+              value={data.profile.trainingActivity}
+              onChange={(e) => setProfile({ trainingActivity: e.target.value as Training })}
+            >
+              <option value="none">None / very little</option>
+              <option value="light">Light (1–2x/week)</option>
+              <option value="moderate">Moderate (3–5x/week)</option>
+              <option value="high">High (6+x/week)</option>
             </select>
           </div>
         </div>
       </div>
 
       {/* Daily targets */}
-      <div className="mt-6 rounded-2xl border bg-white p-4">
+      <div ref={targetsRef} className="mt-6 rounded-2xl border bg-white p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="text-sm font-semibold">Daily targets</div>
@@ -393,11 +434,27 @@ export default function Section2AProfileAndTargets() {
           </div>
         </div>
 
-        {auto ? (
-          <div className="mt-3 rounded-2xl border p-3 text-xs" style={{ color: "var(--sd-slate)" }}>
-            Tip: click <b style={{ color: "var(--sd-ink)" }}>Auto-calc targets</b> to set targets from your profile.
-          </div>
-        ) : null}
+        {/* Mobile-first: keep auto button here too */}
+        <div className="mt-4">
+          <button
+            className={`btn btn-primary w-full justify-center ${!auto ? "opacity-60" : ""}`}
+            type="button"
+            onClick={applyAutoTargets}
+            disabled={!auto}
+          >
+            Auto-calc targets
+          </button>
+
+          {!auto ? (
+            <p className="mt-2 text-xs" style={{ color: "var(--sd-slate)" }}>
+              Add sex + age + height + weight to enable auto-calc.
+            </p>
+          ) : (
+            <p className="mt-2 text-xs" style={{ color: "var(--sd-slate)" }}>
+              Targets updated from your profile.
+            </p>
+          )}
+        </div>
       </div>
     </>
   );

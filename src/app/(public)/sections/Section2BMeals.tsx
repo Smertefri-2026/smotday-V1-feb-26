@@ -111,6 +111,8 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 export default function Section2BMeals() {
   const [data, setData] = useState<Stored>(() => ensureDefaults(null));
+  const [aiBusy, setAiBusy] = useState<Record<string, boolean>>({});
+  const [aiErr, setAiErr] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     setData(ensureDefaults(readLS()));
@@ -171,13 +173,48 @@ export default function Section2BMeals() {
     }));
   }
 
+  async function estimateWithAI(mealId: string) {
+    const meal = data.meals.find((m) => m.id === mealId);
+    if (!meal) return;
+
+    const text = (meal.note || "").trim();
+    if (!text) {
+      setAiErr((p) => ({ ...p, [mealId]: "Write what you ate first." }));
+      return;
+    }
+
+    setAiErr((p) => ({ ...p, [mealId]: null }));
+    setAiBusy((p) => ({ ...p, [mealId]: true }));
+
+    try {
+      const res = await fetch("/api/ai/meal-macros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const out = await res.json();
+      if (!res.ok) throw new Error(out?.error || "AI request failed");
+
+      updateMeal(mealId, {
+        kcal: clamp(safeNum(out.kcal), 0, 20000),
+        p: clamp(safeNum(out.p), 0, 500),
+        f: clamp(safeNum(out.f), 0, 500),
+        c: clamp(safeNum(out.c), 0, 1000),
+      });
+    } catch (e: any) {
+      setAiErr((p) => ({ ...p, [mealId]: e?.message || "Something went wrong." }));
+    } finally {
+      setAiBusy((p) => ({ ...p, [mealId]: false }));
+    }
+  }
+
   return (
     <>
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h3 className="font-heading text-xl font-semibold">Meals</h3>
           <p className="mt-1 text-sm" style={{ color: "var(--sd-slate)" }}>
-            Type macros manually for V1 (fast + reliable). Photos/AI can come later.
+            Log what you ate, then estimate macros with AI — or type them manually.
           </p>
         </div>
 
@@ -196,16 +233,30 @@ export default function Section2BMeals() {
           <div key={m.id} className="rounded-2xl border bg-white p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="text-sm font-semibold">{m.label}</div>
-              {m.label === "Extra" && (
+
+              <div className="flex gap-2">
                 <button
                   type="button"
                   className="btn btn-ghost"
                   style={{ padding: "0.45rem 0.8rem" }}
-                  onClick={() => removeMeal(m.id)}
+                  onClick={() => estimateWithAI(m.id)}
+                  disabled={!!aiBusy[m.id]}
+                  title="Estimate calories + macros from the text"
                 >
-                  Remove
+                  {aiBusy[m.id] ? "Estimating…" : "Estimate with AI"}
                 </button>
-              )}
+
+                {m.label === "Extra" && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ padding: "0.45rem 0.8rem" }}
+                    onClick={() => removeMeal(m.id)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="mt-3 grid gap-2 md:grid-cols-12 md:items-end">
@@ -219,6 +270,12 @@ export default function Section2BMeals() {
                   value={m.note}
                   onChange={(e) => updateMeal(m.id, { note: e.target.value })}
                 />
+
+                {aiErr[m.id] ? (
+                  <div className="mt-2 text-xs" style={{ color: "var(--sd-error)" }}>
+                    {aiErr[m.id]}
+                  </div>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-2 gap-2 md:col-span-7 md:grid-cols-4">
