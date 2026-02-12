@@ -79,23 +79,31 @@ h1, h2, h3, .font-heading {
 
 /* Layout helper (samme idé som PTCrew) */
 .container-app {
-  max-width: 72rem; /* ~ max-w-6xl */
+  max-width: 76rem;            /* litt bredere enn 72rem */
   margin: 0 auto;
-  padding: 0 1rem;
+  padding-left: 1.25rem;       /* 20px */
+  padding-right: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .container-app {
+    padding-left: 2rem;        /* 32px */
+    padding-right: 2rem;
+  }
 }
 
 /* Card / panels */
 .card {
-  border: 1px solid rgba(2, 6, 23, 0.08);
+  border: 1px solid rgba(2, 6, 23, 0.07);
   background: var(--sd-surface);
-  border-radius: var(--sd-radius);
+  border-radius: var(--sd-radius-lg);
   box-shadow: var(--sd-shadow-sm);
 }
 
 .card-soft {
-  border: 1px solid rgba(2, 6, 23, 0.06);
-  background: rgba(255, 255, 255, 0.88);
-  border-radius: var(--sd-radius-lg);
+  border: 1px solid rgba(2, 6, 23, 0.05);
+  background: rgba(255, 255, 255, 0.90);
+  border-radius: calc(var(--sd-radius-lg) + 4px);
   box-shadow: var(--sd-shadow-sm);
   backdrop-filter: blur(10px);
 }
@@ -170,4 +178,17 @@ h1, h2, h3, .font-heading {
   background: radial-gradient(1200px 500px at 10% 10%, rgba(22, 163, 74, 0.18), transparent 60%),
               radial-gradient(900px 450px at 90% 15%, rgba(14, 165, 164, 0.18), transparent 55%),
               linear-gradient(180deg, var(--sd-bg) 0%, rgba(236, 254, 255, 0.55) 100%);
+}
+
+/* Inputs – litt mer “SmerteFri-luft” */
+input, select, textarea {
+  border-color: rgba(2, 6, 23, 0.12);
+}
+
+input[type="number"],
+input[type="text"],
+input[type="email"],
+select,
+textarea {
+  border-radius: 16px;
 }
