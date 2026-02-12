@@ -1,67 +1,22 @@
-// /src/app/page.tsx
-import Link from "next/link";
-
+// /Users/oystein/nettsider/smotday-v1-feb-26/src/app/page.tsx
+import Section1Hero from "@/app/(public)/sections/Section1Hero";
 import Section2QuickTracker from "@/app/(public)/sections/Section2QuickTracker";
 import Section3Coverage from "@/app/(public)/sections/Section3Coverage";
+import Section4SmoodayMatch from "@/app/(public)/sections/Section4SmoodayMatch";
+import Section5Coaching from "@/app/(public)/sections/Section5Coaching";
+import Section6AppCTA from "@/app/(public)/sections/Section6AppCTA";
+import Section7Contact from "@/app/(public)/sections/Section7Contact";
 
 export default function HomePage() {
   return (
     <div className="hero-grad">
-      {/* SECTION 1: HERO */}
-      <section className="container-app py-14">
-        <div className="card-soft p-8 md:p-12">
-          <p className="pill">Your body</p>
-
-          <h1 className="mt-4 text-4xl md:text-6xl font-heading font-bold tracking-tight">
-            Are you sure your body getting everything its needs?
-          </h1>
-
-          <p className="mt-4 max-w-2xl text-lg" style={{ color: "var(--sd-slate)" }}>
-            Test here, enter your data + the food and supplements you take today and check.
-          </p>
-
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link href="/products" className="btn btn-primary">
-              View products
-            </Link>
-            <Link href="/login" className="btn btn-ghost">
-              Login
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 2: QUICK TRACKER */}
+      <Section1Hero />
       <Section2QuickTracker />
-
-      {/* SECTION 3: COVERAGE */}
       <Section3Coverage />
-
-      {/* SECTION 4: SIMPLE VALUE CARDS (keep for now) */}
-      <section className="container-app pb-16">
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="card p-6">
-            <h3 className="font-heading text-xl font-semibold">ODF Powder</h3>
-            <p className="mt-2" style={{ color: "var(--sd-slate)" }}>
-              A premium daily blend — simple to use.
-            </p>
-          </div>
-
-          <div className="card p-6">
-            <h3 className="font-heading text-xl font-semibold">Taste + Effect</h3>
-            <p className="mt-2" style={{ color: "var(--sd-slate)" }}>
-              Taste first — built with well-documented ingredients.
-            </p>
-          </div>
-
-          <div className="card p-6">
-            <h3 className="font-heading text-xl font-semibold">Subscription</h3>
-            <p className="mt-2" style={{ color: "var(--sd-slate)" }}>
-              Monthly delivery (coming soon).
-            </p>
-          </div>
-        </div>
-      </section>
+      <Section4SmoodayMatch />
+      <Section5Coaching />
+      <Section6AppCTA />
+      <Section7Contact />
     </div>
   );
 }

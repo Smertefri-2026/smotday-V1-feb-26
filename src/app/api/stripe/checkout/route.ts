@@ -1,8 +1,6 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
-
 type Item = {
   id: string;
   name: string;
@@ -19,9 +17,13 @@ const PRODUCTS: Record<string, Item> = {
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.STRIPE_SECRET_KEY) {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) {
       return NextResponse.json({ error: "Stripe is not configured (missing STRIPE_SECRET_KEY)." }, { status: 400 });
     }
+
+    // ✅ create inside handler to avoid build-time crash
+    const stripe = new Stripe(key);
 
     const body = await req.json();
     const { sku, plan } = body as { sku: string; plan: "one_time" | "sub" };
@@ -34,10 +36,8 @@ export async function POST(req: Request) {
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-
     const unitAmountNok = plan === "sub" ? product.subNok : product.oneTimeNok;
 
-    // V1: we create price_data dynamically
     const session = await stripe.checkout.sessions.create({
       mode: plan === "sub" ? "subscription" : "payment",
       success_url: `${siteUrl}/checkout/success`,
